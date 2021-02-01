@@ -374,6 +374,10 @@ func (m MongoDB) ServiceName() string {
 	return m.Name + "-svc"
 }
 
+func (m MongoDB) MetricsServiceName() string {
+	return m.Name + "-metrics-svc"
+}
+
 func (m MongoDB) AutomationConfigSecretName() string {
 	return m.Name + "-config"
 }

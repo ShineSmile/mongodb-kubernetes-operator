@@ -212,6 +212,15 @@ func (r *ReplicaSetReconciler) Reconcile(request reconcile.Request) (reconcile.R
 		)
 	}
 
+	r.log.Debug("Ensuring the metrics service exists")
+	if err := r.ensureMetricsService(mdb); err != nil {
+		return status.Update(r.client.Status(), &mdb,
+			statusOptions().
+				withMessage(Error, fmt.Sprintf("Error ensuring the service exists: %s", err)).
+				withFailedPhase(),
+		)
+	}
+
 	// if we're scaling down, we need to wait until the StatefulSet is at the
 	// desired number of replicas. Scaling down has to happen one member at a time
 	if scale.IsScalingDown(mdb) {
@@ -427,6 +436,16 @@ func (r *ReplicaSetReconciler) ensureService(mdb mdbv1.MongoDB) error {
 	return err
 }
 
+func (r *ReplicaSetReconciler) ensureMetricsService(mdb mdbv1.MongoDB) error {
+	metricsService := buildMetricsService(mdb)
+	err := r.client.Create(context.TODO(), &metricsService)
+	if err != nil && apiErrors.IsAlreadyExists(err) {
+		r.log.Infof("The service already exists... moving forward: %s", err)
+		return nil
+	}
+	return err
+}
+
 func (r *ReplicaSetReconciler) createOrUpdateStatefulSet(mdb mdbv1.MongoDB) error {
 	set := appsv1.StatefulSet{}
 	err := r.client.Get(context.TODO(), mdb.NamespacedName(), &set)
@@ -517,6 +536,20 @@ func buildService(mdb mdbv1.MongoDB) corev1.Service {
 		SetServiceType(corev1.ServiceTypeClusterIP).
 		SetClusterIP("None").
 		SetPort(27017).
+		SetPublishNotReadyAddresses(true).
+		Build()
+}
+
+func buildMetricsService(mdb mdbv1.MongoDB) corev1.Service {
+	label := make(map[string]string)
+	label["app"] = mdb.MetricsServiceName()
+	return service.Builder().
+		SetName(mdb.MetricsServiceName()).
+		SetNamespace(mdb.Namespace).
+		SetSelector(label).
+		SetServiceType(corev1.ServiceTypeClusterIP).
+		SetClusterIP("None").
+		SetPort(9216).
 		SetPublishNotReadyAddresses(true).
 		Build()
 }
