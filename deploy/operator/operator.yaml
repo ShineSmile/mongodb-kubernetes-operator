@@ -38,3 +38,7 @@ spec:
               value: "library/mongo"
             - name: MONGODB_REPO_URL
               value: "registry.hub.docker.com"
+            - name: MONGODB_EXPORTER_IMAGE
+              value: "bitnami/mongodb-exporter:0.11.0-debian-10-r96"
+            - name: MONGODB_EXPORTER_USERNAME
+              value: "my-monitor"

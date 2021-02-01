@@ -20,8 +20,17 @@ spec:
           db: admin
         - name: userAdminAnyDatabase
           db: admin
-      scramCredentialsSecretName: my-scram
-
+      scramCredentialsSecretName: my-user
+    - name: my-monitor
+      db: admin
+      passwordSecretRef:
+        name: my-monitor-password
+      roles:
+        - name: clusterMonitor
+          db: admin
+        - name: read
+          db: local
+      scramCredentialsSecretName: my-monitor
 # the user credentials will be generated from this secret
 # once the credentials are generated, this secret is no longer required
 ---
@@ -32,3 +41,11 @@ metadata:
 type: Opaque
 stringData:
   password: 58LObjiMpxcjP1sMDW
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-monitor-password
+type: Opaque
+stringData:
+  password: pOOKWZiDG3NqERoqNK

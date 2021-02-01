@@ -174,6 +174,10 @@ func TestStatefulSet_IsCorrectlyConfigured(t *testing.T) {
 	assert.NotNil(t, acVolume.Secret, "automation config should be stored in a secret!")
 	assert.Nil(t, acVolume.ConfigMap, "automation config should be stored in a secret, not a config map!")
 
+	mpVolume, err := getVolumeByName(sts, "monitor-password")
+	assert.NoError(t, err)
+	assert.NotNil(t, mpVolume.Secret, "monitor password should be stored in a secret!")
+	assert.Nil(t, mpVolume.ConfigMap, "monitor password should be stored in a secret, not a config map!")
 }
 
 func getVolumeByName(sts appsv1.StatefulSet, volumeName string) (corev1.Volume, error) {
