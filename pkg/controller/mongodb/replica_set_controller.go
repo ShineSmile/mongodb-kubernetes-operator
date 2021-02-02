@@ -436,7 +436,7 @@ func (r *ReplicaSetReconciler) ensureService(mdb mdbv1.MongoDBCommunity) error {
 	return err
 }
 
-func (r *ReplicaSetReconciler) ensureMetricsService(mdb mdbv1.MongoDB) error {
+func (r *ReplicaSetReconciler) ensureMetricsService(mdb mdbv1.MongoDBCommunity) error {
 	metricsService := buildMetricsService(mdb)
 	err := r.client.Create(context.TODO(), &metricsService)
 	if err != nil && apiErrors.IsAlreadyExists(err) {
@@ -540,7 +540,7 @@ func buildService(mdb mdbv1.MongoDBCommunity) corev1.Service {
 		Build()
 }
 
-func buildMetricsService(mdb mdbv1.MongoDB) corev1.Service {
+func buildMetricsService(mdb mdbv1.MongoDBCommunity) corev1.Service {
 	label := make(map[string]string)
 	label["app"] = mdb.MetricsServiceName()
 	return service.Builder().

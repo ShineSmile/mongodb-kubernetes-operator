@@ -397,7 +397,7 @@ func (m MongoDBCommunity) ServiceName() string {
 	return m.Name + "-svc"
 }
 
-func (m MongoDB) MetricsServiceName() string {
+func (m MongoDBCommunity) MetricsServiceName() string {
 	return m.Name + "-metrics-svc"
 }
 
