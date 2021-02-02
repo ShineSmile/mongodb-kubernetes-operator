@@ -541,12 +541,15 @@ func buildService(mdb mdbv1.MongoDBCommunity) corev1.Service {
 }
 
 func buildMetricsService(mdb mdbv1.MongoDBCommunity) corev1.Service {
-	label := make(map[string]string)
-	label["app"] = mdb.ServiceName()
+	serviceLabel := make(map[string]string)
+	serviceLabel["app"] = mdb.ServiceName()
+	metricsLabel := make(map[string]string)
+	metricsLabel["app"] = mdb.MetricsServiceName()
 	return service.Builder().
 		SetName(mdb.MetricsServiceName()).
 		SetNamespace(mdb.Namespace).
-		SetSelector(label).
+		SetLabels(metricsLabel).
+		SetSelector(serviceLabel).
 		SetServiceType(corev1.ServiceTypeClusterIP).
 		SetClusterIP("None").
 		SetPort(9216).
