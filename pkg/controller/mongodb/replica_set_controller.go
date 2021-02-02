@@ -544,7 +544,8 @@ func buildMetricsService(mdb mdbv1.MongoDBCommunity) corev1.Service {
 	serviceLabel := make(map[string]string)
 	serviceLabel["app"] = mdb.ServiceName()
 	metricsLabel := make(map[string]string)
-	metricsLabel["app"] = mdb.MetricsServiceName()
+	metricsLabel["app"] = mdb.ServiceName()
+	metricsLabel["app.kubernetes.io/component"] = "metrics"
 	return service.Builder().
 		SetName(mdb.MetricsServiceName()).
 		SetNamespace(mdb.Namespace).
@@ -553,6 +554,7 @@ func buildMetricsService(mdb mdbv1.MongoDBCommunity) corev1.Service {
 		SetServiceType(corev1.ServiceTypeClusterIP).
 		SetClusterIP("None").
 		SetPort(9216).
+		SetPortName("metrics").
 		SetPublishNotReadyAddresses(true).
 		Build()
 }
