@@ -542,7 +542,7 @@ func buildService(mdb mdbv1.MongoDBCommunity) corev1.Service {
 
 func buildMetricsService(mdb mdbv1.MongoDBCommunity) corev1.Service {
 	label := make(map[string]string)
-	label["app"] = mdb.MetricsServiceName()
+	label["app"] = mdb.ServiceName()
 	return service.Builder().
 		SetName(mdb.MetricsServiceName()).
 		SetNamespace(mdb.Namespace).
