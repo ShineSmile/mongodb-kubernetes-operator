@@ -13,6 +13,7 @@ Here is a talk from MongoDB Live 2020 about the Community Operator:
 
 - [Documentation](#documentation)
 - [Supported Features](#supported-features)
+  - [Planned Features](#planned-features)
 - [Contribute](#contribute)
 - [License](#license)
 
@@ -33,11 +34,12 @@ The MongoDB Community Kubernetes Operator supports the following features:
 - Upgrade and downgrade MongoDB server version
 - Scale replica sets up and down
 - Read from and write to the replica set while scaling, upgrading, and downgrading. These operations are done in an "always up" manner.
-- Report MongoDB server state via the [MongoDB resource](/deploy/crds/mongodb.com_mongodb_crd.yaml) `status` field
+- Report MongoDB server state via the [MongoDB resource](/deploy/crds/mongodb.com_mongodbcommunity_crd.yaml) `status` field
 - Use any of the available [Docker MongoDB images](https://hub.docker.com/_/mongo/)
 - Connect to the replica set from inside the Kubernetes cluster (no external connectivity)
 - Secure client-to-server and server-to-server connections with TLS
 - Create users with [SCRAM](https://docs.mongodb.com/manual/core/security-scram/) authentication
+- Create custom roles
 
 ### Planned Features
 - Server internal authentication via keyfile
