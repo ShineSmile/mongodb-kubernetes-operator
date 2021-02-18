@@ -67,10 +67,11 @@ rules:
   verbs:
   - get
 - apiGroups:
-  - mongodb.com
+  - mongodbcommunity.mongodb.com
   resources:
-  - '*'
-  - mongodbs
+  - mongodbcommunity
+  - mongodbcommunity/status
+  - mongodbcommunity/spec
   verbs:
   - create
   - delete
