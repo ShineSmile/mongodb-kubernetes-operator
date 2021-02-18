@@ -51,8 +51,6 @@ func assertStatefulSetIsBuiltCorrectly(t *testing.T, mdb mdbv1.MongoDBCommunity,
 	assert.Len(t, sts.Spec.Template.Spec.Containers[1].Env, 1)
 	assert.Len(t, sts.Spec.Template.Spec.Containers[0].Env, 1)
 
-	//TODO add metrics exporter test
-
 	agentContainer := sts.Spec.Template.Spec.Containers[2]
 	assert.Equal(t, "agent-image", agentContainer.Image)
 	probe := agentContainer.ReadinessProbe
@@ -65,6 +63,11 @@ func assertStatefulSetIsBuiltCorrectly(t *testing.T, mdb mdbv1.MongoDBCommunity,
 	assert.Equal(t, "repo/mongo:4.2.2", mongodContainer.Image)
 	assert.NotNil(t, sts.Spec.Template.Spec.Containers[2].ReadinessProbe)
 	assert.Len(t, mongodContainer.VolumeMounts, 4)
+
+	metricsContainer := sts.Spec.Template.Spec.Containers[0]
+	assert.Equal(t, mongodbExporterName, metricsContainer.Name)
+	assert.Equal(t, "bitnami/mongodb-exporter:0.11.0-debian-10-r96", metricsContainer.Image)
+	assert.Len(t, metricsContainer.VolumeMounts, 1)
 
 	initContainer := sts.Spec.Template.Spec.InitContainers[0]
 	assert.Equal(t, versionUpgradeHookName, initContainer.Name)

@@ -39,6 +39,7 @@ import (
 
 func init() {
 	os.Setenv("AGENT_IMAGE", "agent-image")
+	os.Setenv("MONGODB_EXPORTER_IMAGE", "bitnami/mongodb-exporter:0.11.0-debian-10-r96")
 }
 
 func newTestReplicaSet() mdbv1.MongoDBCommunity {
@@ -157,8 +158,6 @@ func TestStatefulSet_IsCorrectlyConfigured(t *testing.T) {
 
 	assert.Len(t, sts.Spec.Template.Spec.Containers, 3)
 
-	//TODO add metrics exporter test
-
 	agentContainer := sts.Spec.Template.Spec.Containers[2]
 	assert.Equal(t, agentName, agentContainer.Name)
 	assert.Equal(t, os.Getenv(agentImageEnv), agentContainer.Image)
@@ -168,6 +167,10 @@ func TestStatefulSet_IsCorrectlyConfigured(t *testing.T) {
 	mongodbContainer := sts.Spec.Template.Spec.Containers[1]
 	assert.Equal(t, mongodbName, mongodbContainer.Name)
 	assert.Equal(t, "repo/mongo:4.2.2", mongodbContainer.Image)
+
+	metricsContainer := sts.Spec.Template.Spec.Containers[0]
+	assert.Equal(t, mongodbExporterName, metricsContainer.Name)
+	assert.Equal(t, "bitnami/mongodb-exporter:0.11.0-debian-10-r96", metricsContainer.Image)
 
 	assert.Equal(t, resourcerequirements.Defaults(), agentContainer.Resources)
 
