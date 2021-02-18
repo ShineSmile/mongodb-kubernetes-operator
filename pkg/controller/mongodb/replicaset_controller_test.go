@@ -155,15 +155,17 @@ func TestStatefulSet_IsCorrectlyConfigured(t *testing.T) {
 	err = mgr.GetClient().Get(context.TODO(), types.NamespacedName{Name: mdb.Name, Namespace: mdb.Namespace}, &sts)
 	assert.NoError(t, err)
 
-	assert.Len(t, sts.Spec.Template.Spec.Containers, 2)
+	assert.Len(t, sts.Spec.Template.Spec.Containers, 3)
 
-	agentContainer := sts.Spec.Template.Spec.Containers[1]
+	//TODO add metrics exporter test
+
+	agentContainer := sts.Spec.Template.Spec.Containers[2]
 	assert.Equal(t, agentName, agentContainer.Name)
 	assert.Equal(t, os.Getenv(agentImageEnv), agentContainer.Image)
 	expectedProbe := probes.New(defaultReadiness())
 	assert.True(t, reflect.DeepEqual(&expectedProbe, agentContainer.ReadinessProbe))
 
-	mongodbContainer := sts.Spec.Template.Spec.Containers[0]
+	mongodbContainer := sts.Spec.Template.Spec.Containers[1]
 	assert.Equal(t, mongodbName, mongodbContainer.Name)
 	assert.Equal(t, "repo/mongo:4.2.2", mongodbContainer.Image)
 
@@ -533,8 +535,8 @@ func TestReplicaSet_IsScaledUpToDesiredMembers_WhenFirstCreated(t *testing.T) {
 
 func TestOpenshift_Configuration(t *testing.T) {
 	sts := performReconciliationAndGetStatefulSet(t, "openshift_mdb.yaml")
-	assert.Equal(t, "MANAGED_SECURITY_CONTEXT", sts.Spec.Template.Spec.Containers[1].Env[3].Name)
-	assert.Equal(t, "MANAGED_SECURITY_CONTEXT", sts.Spec.Template.Spec.Containers[0].Env[1].Name)
+	assert.Equal(t, "MANAGED_SECURITY_CONTEXT", sts.Spec.Template.Spec.Containers[2].Env[3].Name)
+	assert.Equal(t, "MANAGED_SECURITY_CONTEXT", sts.Spec.Template.Spec.Containers[1].Env[1].Name)
 }
 
 func TestVolumeClaimTemplates_Configuration(t *testing.T) {
