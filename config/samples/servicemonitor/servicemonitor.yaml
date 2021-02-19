@@ -1,0 +1,19 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: monitor-example-mongodb
+  namespace: kube-monitor
+  labels:
+    release: rls-prometheus-stack
+spec:
+  endpoints:
+  - path: /metrics
+    port: metrics
+    interval:  30s
+  namespaceSelector:
+    matchNames:
+    - mongo
+  selector:
+    matchLabels:
+      app: example-mongodb-svc
+      app.kubernetes.io/component: metrics

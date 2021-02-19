@@ -60,6 +60,8 @@ const (
 	agentHealthStatusFilePathEnv = "AGENT_STATUS_FILEPATH"
 	mongodbImageEnv              = "MONGODB_IMAGE"
 	mongodbRepoUrl               = "MONGODB_REPO_URL"
+	mongodbExporterImageEnv      = "MONGODB_EXPORTER_IMAGE"
+	mongodbExporterUserName      = "MONGODB_EXPORTER_USERNAME"
 	headlessAgentEnv             = "HEADLESS_AGENT"
 	podNamespaceEnv              = "POD_NAMESPACE"
 	automationConfigEnv          = "AUTOMATION_CONFIG_MAP"
@@ -67,6 +69,7 @@ const (
 	AutomationConfigKey            = "cluster-config.json"
 	agentName                      = "mongodb-agent"
 	mongodbName                    = "mongod"
+	mongodbExporterName            = "metrics"
 	versionUpgradeHookName         = "mongod-posthook"
 	dataVolumeName                 = "data-volume"
 	versionManifestFilePath        = "/usr/local/version_manifest.json"
@@ -74,6 +77,7 @@ const (
 	clusterFilePath                = "/var/lib/automation/config/cluster-config.json"
 	operatorServiceAccountName     = "mongodb-kubernetes-operator"
 	agentHealthStatusFilePathValue = "/var/log/mongodb-mms-automation/healthstatus/agent-health-status.json"
+	exporterSecretFilePathValue    = "/opt/bitnami/mongodb-exporter/secret"
 
 	// lastVersionAnnotationKey should indicate which version of MongoDB was last
 	// configured
@@ -188,6 +192,15 @@ func (r ReplicaSetReconciler) Reconcile(ctx context.Context, request reconcile.R
 
 	r.log.Debug("Ensuring the service exists")
 	if err := r.ensureService(mdb); err != nil {
+		return status.Update(r.client.Status(), &mdb,
+			statusOptions().
+				withMessage(Error, fmt.Sprintf("Error ensuring the service exists: %s", err)).
+				withFailedPhase(),
+		)
+	}
+
+	r.log.Debug("Ensuring the metrics service exists")
+	if err := r.ensureMetricsService(mdb); err != nil {
 		return status.Update(r.client.Status(), &mdb,
 			statusOptions().
 				withMessage(Error, fmt.Sprintf("Error ensuring the service exists: %s", err)).
@@ -410,6 +423,16 @@ func (r *ReplicaSetReconciler) ensureService(mdb mdbv1.MongoDBCommunity) error {
 	return err
 }
 
+func (r *ReplicaSetReconciler) ensureMetricsService(mdb mdbv1.MongoDBCommunity) error {
+	metricsService := buildMetricsService(mdb)
+	err := r.client.Create(context.TODO(), &metricsService)
+	if err != nil && apiErrors.IsAlreadyExists(err) {
+		r.log.Infof("The service already exists... moving forward: %s", err)
+		return nil
+	}
+	return err
+}
+
 func (r *ReplicaSetReconciler) createOrUpdateStatefulSet(mdb mdbv1.MongoDBCommunity) error {
 	set := appsv1.StatefulSet{}
 	err := r.client.Get(context.TODO(), mdb.NamespacedName(), &set)
@@ -500,6 +523,25 @@ func buildService(mdb mdbv1.MongoDBCommunity) corev1.Service {
 		SetServiceType(corev1.ServiceTypeClusterIP).
 		SetClusterIP("None").
 		SetPort(27017).
+		SetPublishNotReadyAddresses(true).
+		Build()
+}
+
+func buildMetricsService(mdb mdbv1.MongoDBCommunity) corev1.Service {
+	serviceLabel := make(map[string]string)
+	serviceLabel["app"] = mdb.ServiceName()
+	metricsLabel := make(map[string]string)
+	metricsLabel["app"] = mdb.ServiceName()
+	metricsLabel["app.kubernetes.io/component"] = "metrics"
+	return service.Builder().
+		SetName(mdb.MetricsServiceName()).
+		SetNamespace(mdb.Namespace).
+		SetLabels(metricsLabel).
+		SetSelector(serviceLabel).
+		SetServiceType(corev1.ServiceTypeClusterIP).
+		SetClusterIP("None").
+		SetPort(9216).
+		SetPortName("metrics").
 		SetPublishNotReadyAddresses(true).
 		Build()
 }
@@ -741,6 +783,29 @@ exec mongod -f /data/automation-mongod.conf ;
 	)
 }
 
+func mongodbExporterContainer(volumeMounts []corev1.VolumeMount) container.Modification {
+	exporterCommand := []string{
+		"/bin/sh",
+		"-c",
+		`
+/bin/mongodb_exporter --mongodb.uri mongodb://$(echo $MONGODB_EXPORTER_USERNAME):$(cat /opt/bitnami/mongodb-exporter/secret/password | sed -r "s/@/%40/g;s/:/%3A/g")@localhost:27017/admin
+`,
+	}
+	return container.Apply(
+		container.WithName(mongodbExporterName),
+		container.WithImage(os.Getenv(mongodbExporterImageEnv)),
+		container.WithResourceRequirements(resourcerequirements.Defaults()),
+		container.WithCommand(exporterCommand),
+		container.WithEnvs(
+			corev1.EnvVar{
+				Name:  mongodbExporterUserName,
+				Value: os.Getenv(mongodbExporterUserName),
+			},
+		),
+		container.WithVolumeMounts(volumeMounts),
+	)
+}
+
 func buildStatefulSetModificationFunction(mdb mdbv1.MongoDBCommunity) statefulset.Modification {
 	labels := map[string]string{
 		"app": mdb.ServiceName(),
@@ -762,6 +827,9 @@ func buildStatefulSetModificationFunction(mdb mdbv1.MongoDBCommunity) statefulse
 
 	dataVolume := statefulset.CreateVolumeMount(dataVolumeName, "/data")
 
+	exporterSecretVolume := statefulset.CreateVolumeFromSecret("monitor-password", (os.Getenv(mongodbExporterUserName) + "-password"))
+	exporterSecretVolumeMount := statefulset.CreateVolumeMount(exporterSecretVolume.Name, exporterSecretFilePathValue, statefulset.WithReadOnly(true))
+
 	return statefulset.Apply(
 		statefulset.WithName(mdb.Name),
 		statefulset.WithNamespace(mdb.Namespace),
@@ -778,9 +846,11 @@ func buildStatefulSetModificationFunction(mdb mdbv1.MongoDBCommunity) statefulse
 				podtemplatespec.WithVolume(healthStatusVolume),
 				podtemplatespec.WithVolume(hooksVolume),
 				podtemplatespec.WithVolume(automationConfigVolume),
+				podtemplatespec.WithVolume(exporterSecretVolume),
 				podtemplatespec.WithServiceAccount(operatorServiceAccountName),
 				podtemplatespec.WithContainer(agentName, mongodbAgentContainer(mdb.AutomationConfigSecretName(), []corev1.VolumeMount{agentHealthStatusVolumeMount, automationConfigVolumeMount, dataVolume})),
 				podtemplatespec.WithContainer(mongodbName, mongodbContainer(mdb.Spec.Version, []corev1.VolumeMount{mongodHealthStatusVolumeMount, dataVolume, hooksVolumeMount})),
+				podtemplatespec.WithContainer(mongodbExporterName, mongodbExporterContainer([]corev1.VolumeMount{exporterSecretVolumeMount})),
 				podtemplatespec.WithInitContainer(versionUpgradeHookName, versionUpgradeHookInit([]corev1.VolumeMount{hooksVolumeMount})),
 				buildTLSPodSpecModification(mdb),
 				buildScramPodSpecModification(mdb),

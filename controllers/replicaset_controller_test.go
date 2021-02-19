@@ -39,6 +39,7 @@ import (
 
 func init() {
 	os.Setenv("AGENT_IMAGE", "agent-image")
+	os.Setenv("MONGODB_EXPORTER_IMAGE", "bitnami/mongodb-exporter:0.11.0-debian-10-r96")
 }
 
 func newTestReplicaSet() mdbv1.MongoDBCommunity {
@@ -155,17 +156,21 @@ func TestStatefulSet_IsCorrectlyConfigured(t *testing.T) {
 	err = mgr.GetClient().Get(context.TODO(), types.NamespacedName{Name: mdb.Name, Namespace: mdb.Namespace}, &sts)
 	assert.NoError(t, err)
 
-	assert.Len(t, sts.Spec.Template.Spec.Containers, 2)
+	assert.Len(t, sts.Spec.Template.Spec.Containers, 3)
 
-	agentContainer := sts.Spec.Template.Spec.Containers[1]
+	agentContainer := sts.Spec.Template.Spec.Containers[2]
 	assert.Equal(t, agentName, agentContainer.Name)
 	assert.Equal(t, os.Getenv(agentImageEnv), agentContainer.Image)
 	expectedProbe := probes.New(defaultReadiness())
 	assert.True(t, reflect.DeepEqual(&expectedProbe, agentContainer.ReadinessProbe))
 
-	mongodbContainer := sts.Spec.Template.Spec.Containers[0]
+	mongodbContainer := sts.Spec.Template.Spec.Containers[1]
 	assert.Equal(t, mongodbName, mongodbContainer.Name)
 	assert.Equal(t, "repo/mongo:4.2.2", mongodbContainer.Image)
+
+	metricsContainer := sts.Spec.Template.Spec.Containers[0]
+	assert.Equal(t, mongodbExporterName, metricsContainer.Name)
+	assert.Equal(t, "bitnami/mongodb-exporter:0.11.0-debian-10-r96", metricsContainer.Image)
 
 	assert.Equal(t, resourcerequirements.Defaults(), agentContainer.Resources)
 
@@ -174,6 +179,10 @@ func TestStatefulSet_IsCorrectlyConfigured(t *testing.T) {
 	assert.NotNil(t, acVolume.Secret, "automation config should be stored in a secret!")
 	assert.Nil(t, acVolume.ConfigMap, "automation config should be stored in a secret, not a config map!")
 
+	mpVolume, err := getVolumeByName(sts, "monitor-password")
+	assert.NoError(t, err)
+	assert.NotNil(t, mpVolume.Secret, "monitor password should be stored in a secret!")
+	assert.Nil(t, mpVolume.ConfigMap, "monitor password should be stored in a secret, not a config map!")
 }
 
 func getVolumeByName(sts appsv1.StatefulSet, volumeName string) (corev1.Volume, error) {
@@ -529,8 +538,8 @@ func TestReplicaSet_IsScaledUpToDesiredMembers_WhenFirstCreated(t *testing.T) {
 
 func TestOpenshift_Configuration(t *testing.T) {
 	sts := performReconciliationAndGetStatefulSet(t, "openshift_mdb.yaml")
-	assert.Equal(t, "MANAGED_SECURITY_CONTEXT", sts.Spec.Template.Spec.Containers[1].Env[3].Name)
-	assert.Equal(t, "MANAGED_SECURITY_CONTEXT", sts.Spec.Template.Spec.Containers[0].Env[1].Name)
+	assert.Equal(t, "MANAGED_SECURITY_CONTEXT", sts.Spec.Template.Spec.Containers[2].Env[3].Name)
+	assert.Equal(t, "MANAGED_SECURITY_CONTEXT", sts.Spec.Template.Spec.Containers[1].Env[1].Name)
 }
 
 func TestVolumeClaimTemplates_Configuration(t *testing.T) {

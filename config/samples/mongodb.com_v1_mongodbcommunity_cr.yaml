@@ -20,7 +20,17 @@ spec:
           db: admin
         - name: userAdminAnyDatabase
           db: admin
-      scramCredentialsSecretName: my-scram
+      scramCredentialsSecretName: my-user
+    - name: my-monitor
+      db: admin
+      passwordSecretRef:
+        name: my-monitor-password
+      roles:
+        - name: clusterMonitor
+          db: admin
+        - name: read
+          db: local
+      scramCredentialsSecretName: my-monitor
   additionalMongodConfig:
     storage.wiredTiger.engineConfig.journalCompressor: zlib
 
@@ -31,6 +41,14 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: my-user-password
+type: Opaque
+stringData:
+  password: <your-password-here>
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-monitor-password
 type: Opaque
 stringData:
   password: <your-password-here>
